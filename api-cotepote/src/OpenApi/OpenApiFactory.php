@@ -49,6 +49,15 @@ class OpenApiFactory implements OpenApiFactoryInterface
                 ]
             ]
         ]);
+        $schemas['Token'] = new ArrayObject([
+            'type' => 'object',
+            'propereties' => [
+                'token' => [
+                    'type' => 'string',
+                    'readOnly' => true,
+                ]
+            ]
+        ]);
 
 
         $meOperation = $openApi->getPaths()->getPath('/api/me')->getGet()->withParameters([]);
@@ -60,7 +69,7 @@ class OpenApiFactory implements OpenApiFactoryInterface
                 operationId: 'postApiLogin',
                 tags: ['Auth'],
                 requestBody: new RequestBody(
-                    content: new ArrayObject([
+                    content: new \ArrayObject([
                         'application/json' => [
                             'schema' => [
                                 '$ref' => '#/components/schemas/Credentials'
@@ -70,11 +79,11 @@ class OpenApiFactory implements OpenApiFactoryInterface
                 ),
                 responses: [
                     '200' => [
-                        'description' => 'Utilisateur connecté',
+                        'description' => 'Token JWT connecté',
                         'content' => [
                             'application/json' => [
                                 'schema' => [
-                                    '$ref' => '#/compenents/schemas/User-read.User'
+                                    '$ref' => '#/compenents/schemas/Token'
                                 ]
                             ]
                         ]
@@ -87,7 +96,7 @@ class OpenApiFactory implements OpenApiFactoryInterface
 
         $pathItem = new PathItem(
             post: new Operation(
-                operationId: 'postApiLoout',
+                operationId: 'postApiLogout',
                 tags: ['Auth'], 
                 responses: [
                     '204' => []

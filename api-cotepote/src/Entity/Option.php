@@ -3,6 +3,8 @@
 namespace App\Entity;
 
 use App\Controller\PostSetTrue;
+use Doctrine\Common\Collections\ArrayCollection;
+use Doctrine\Common\Collections\Collection;
 use Doctrine\ORM\Mapping as ORM;
 use App\Repository\OptionRepository;
 use ApiPlatform\Core\Annotation\ApiResource;
@@ -22,7 +24,7 @@ use Symfony\Component\Validator\Constraints as Assert;
  *       },
  *       "setTrue" = {
  *          "method" = "POST",
- *          "path" = "/api/options/{id}/setTrue",
+ *          "path" = "/options/{id}/setTrue",
  *          "controller" =PostSetTrue::class,
  *          "denormalization_context" = {"groups" = {"aucun"}},
  *          "openapi_context" = {
@@ -38,6 +40,7 @@ class Option
      * @ORM\Id
      * @ORM\GeneratedValue
      * @ORM\Column(type="integer")
+     * @Groups({"read:alloptions","read:userOption"})
      */
     private $id;
 
@@ -58,9 +61,24 @@ class Option
     private $isTrue = false;
 
     /**
-     * @ORM\ManyToOne(targetEntity=bet::class, inversedBy="options")
+     * @ORM\ManyToOne(targetEntity=Bet::class, inversedBy="options")
+     * @Groups({"read:userOption"})
      */
     private $bet;
+
+    /**
+     * @ORM\OneToMany(targetEntity=UserOption::class, mappedBy="options", orphanRemoval=true)
+     * @Groups({"read:bet"})
+     */
+    private $userOptions;
+
+
+
+
+    public function __construct()
+    {
+        $this->userOptions = new ArrayCollection();
+    }
 
     public function getId(): ?int
     {
@@ -99,6 +117,36 @@ class Option
     public function setBet(?bet $bet): self
     {
         $this->bet = $bet;
+
+        return $this;
+    }
+
+    /**
+     * @return Collection|UserOption[]
+     */
+    public function getUserOptions(): Collection
+    {
+        return $this->userOptions;
+    }
+
+    public function addUserOption(UserOption $userOption): self
+    {
+        if (!$this->userOptions->contains($userOption)) {
+            $this->userOptions[] = $userOption;
+            $userOption->setOptions($this);
+        }
+
+        return $this;
+    }
+
+    public function removeUserOption(UserOption $userOption): self
+    {
+        if ($this->userOptions->removeElement($userOption)) {
+            // set the owning side to null (unless already changed)
+            if ($userOption->getOptions() === $this) {
+                $userOption->setOptions(null);
+            }
+        }
 
         return $this;
     }

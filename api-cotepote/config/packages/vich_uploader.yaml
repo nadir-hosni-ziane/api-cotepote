@@ -1,0 +1,12 @@
+vich_uploader:
+    db_driver: orm
+
+    mappings:
+        users_image:
+            uri_prefix: /images/users
+            upload_destination: '%kernel.project_dir%/public/images/users'
+            namer: Vich\UploaderBundle\Naming\OrignameNamer
+        bets_image:
+            uri_prefix: /images/bets
+            upload_destination: '%kernel.project_dir%/public/images/bets'
+            namer: Vich\UploaderBundle\Naming\OrignameNamer

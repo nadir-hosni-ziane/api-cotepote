@@ -6,21 +6,27 @@ namespace App\Entity;
 use App\Controller\Me;
 use Doctrine\ORM\Mapping as ORM;
 use App\Repository\UserRepository;
+use App\Controller\UserImageController;
 use Doctrine\Common\Collections\Collection;
 use ApiPlatform\Core\Annotation\ApiResource;
+use Symfony\Component\HttpFoundation\File\File;
 use Doctrine\Common\Collections\ArrayCollection;
 use Symfony\Component\Serializer\Annotation\Groups;
 use Symfony\Component\Validator\Constraints as Assert;
+use Vich\UploaderBundle\Mapping\Annotation as Vich;
 use Symfony\Component\Security\Core\User\UserInterface;
+use Vich\UploaderBundle\Mapping\Annotation\UploadableField;
+use Lexik\Bundle\JWTAuthenticationBundle\Security\User\JWTUserInterface;
 use Symfony\Component\Security\Core\User\PasswordAuthenticatedUserInterface;
 
 /**
  * @ORM\Entity(repositoryClass=UserRepository::class)
+ * 
  * @ApiResource(
- *     security = "is_granted('ROLE_USER')",
  *     normalizationContext = {"groups" = {"read:user"}},
  *     denormalizationContext = {"groups" = {"create:user"}},
  *     collectionOperations = {
+ *        "get",
  *        "post"
  *     },
  *     itemOperations = {
@@ -39,13 +45,37 @@ use Symfony\Component\Security\Core\User\PasswordAuthenticatedUserInterface;
  *            "read" = false,
  *            "security" = "is_granted('ROLE_USER')",
  *            "openapi_context" = {
- *                "security" = {"cookieAuth" = {""}} 
+ *                "security" = {{"bearerAuth" = {}}} 
  *             },
- *         }
+ *         },
+ *         "image" = {
+ *              "method" = "post",
+ *              "path" = "/users/{id}/image",
+ *              "deserialize" = false,
+ *              "controller" = UserImageController::class,
+ *              "openapi_context" = {
+ *                  "requestBody" = {
+ *                      "content" = {
+ *                          "multipart/form-data" = {
+ *                              "schema" = {
+ *                                  "type" = "object",
+ *                                  "properties" = {
+ *                                      "file" = {
+ *                                          "type" = "string",
+ *                                          "format" = "binary"
+ *                                      }
+ *                                  }
+ *                              }
+ *                          }
+ *                      }
+ *                  }
+ *              }
+ *          }
  *     }
  * )
+ *  @Vich\Uploadable
  */
-class User implements UserInterface, PasswordAuthenticatedUserInterface
+class User implements UserInterface, PasswordAuthenticatedUserInterface, JWTUserInterface
 {
     /**
      * @ORM\Id
@@ -104,14 +134,50 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
      */
     private $bets;
 
+    /**
+     * @ORM\OneToMany(targetEntity=UserOption::class, mappedBy="user", orphanRemoval=true)
+     */
+    private $userOptions;
+
+    /**
+     * @var File|null
+     * @Vich\UploadableField(mapping="users_image", fileNameProperty="filePath")
+     */
+    private $file;
+
+    /**
+     * @ORM\Column(type="string", length=255, nullable=true)
+     * 
+     */
+    private $filePath;
+
+    /**
+     * @var string|null
+     * @Groups({"read:user"})
+     */
+    private $fileurl;
+
+    /**
+     * @ORM\Column(type="datetime", nullable=true)
+     */
+    private $updatedAt;
+
     public function __construct()
     {
         $this->bets = new ArrayCollection();
+        $this->userOptions = new ArrayCollection();
     }
 
     public function getId(): ?int
     {
         return $this->id;
+    }
+
+    public function setId(?int $id): self 
+    {
+        $this->id = $id;
+
+        return $this;
     }
 
     public function getEmail(): ?string
@@ -173,9 +239,12 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
 
     public function setPassword(string $password): self
     {
-        $this->password = $password;
-
-        return $this;
+         $this->password = $password;
+        
+         return $this;
+        // $this->password = $password;
+        
+        // return $this;
     }
 
     /**
@@ -196,6 +265,11 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
     {
         // If you store any temporary, sensitive data on the user, clear it here
         // $this->plainPassword = null;
+    }
+
+    public static function createFromPayload($id, array $payload)
+    {
+        return (new User())->setId($id)->setEmail($payload['username'] ?? '');
     }
 
     public function getName(): ?string
@@ -248,6 +322,110 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
                 $bet->setUser(null);
             }
         }
+
+        return $this;
+    }
+
+    /**
+     * @return Collection|UserOption[]
+     */
+    public function getUserOptions(): Collection
+    {
+        return $this->userOptions;
+    }
+
+    public function addUserOption(UserOption $userOption): self
+    {
+        if (!$this->userOptions->contains($userOption)) {
+            $this->userOptions[] = $userOption;
+            $userOption->setUser($this);
+        }
+
+        return $this;
+    }
+
+    public function removeUserOption(UserOption $userOption): self
+    {
+        if ($this->userOptions->removeElement($userOption)) {
+            // set the owning side to null (unless already changed)
+            if ($userOption->getUser() === $this) {
+                $userOption->setUser(null);
+            }
+        }
+
+        return $this;
+    }
+
+    public function getFilePath(): ?string
+    {
+        return $this->filePath;
+    }
+
+    public function setFilePath(?string $filePath): self
+    {
+        $this->filePath = $filePath;
+
+        return $this;
+    }
+    
+    
+
+    /**
+     * Get the value of file
+     *
+     * @return  File|null
+     */ 
+    public function getFile(): ?File
+    {
+        return $this->file;
+    }
+
+    /**
+     * Set the value of file
+     *
+     * @param  File|null  $file
+     *
+     * @return User
+     */ 
+    public function setFile(?File $file): User
+    {
+        $this->file = $file;
+
+        return $this;
+    }
+
+    /**
+     * Get the value of fileurl
+     *
+     * @return  string|null
+     */ 
+    public function getFileurl(): ?string
+    {
+        return $this->fileurl;
+    }
+
+    /**
+     * Set the value of fileurl
+     *
+     * @param  string|null  $fileurl
+     *
+     * @return  self
+     */ 
+    public function setFileurl(?string $fileurl): User
+    {
+        $this->fileurl = $fileurl;
+
+        return $this;
+    }
+
+    public function getUpdatedAt(): ?\DateTimeInterface
+    {
+        return $this->updatedAt;
+    }
+
+    public function setUpdatedAt(?\DateTimeInterface $updatedAt): self
+    {
+        $this->updatedAt = $updatedAt;
 
         return $this;
     }
